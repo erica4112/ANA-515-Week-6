@@ -1,0 +1,158 @@
+---
+title: "Assignment 03 Getting and Cleaning Data"
+author: "Erica Peng"
+date: "2023-09-21"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Step 1: Move this into a good local directory for your current working directory and read and save it
+```{r}
+getwd()
+library(tidyverse)
+# Set the working directory
+setwd("/Users/owner/Downloads")
+
+# Import the CSV file into a data frame
+data <- read.csv("StormEvents_details-ftp_v1.0_d1977_c20220425.csv.csv")
+
+# View the first few rows of the data frame
+head(data)
+
+```
+
+## Step 2: Limit the dataframe to the following column
+```{r}
+newdata <- data[, c("BEGIN_YEARMONTH", "BEGIN_DAY", 
+                    "BEGIN_TIME", "END_YEARMONTH", "END_DAY", "END_TIME", "EPISODE_ID", 
+                    "EVENT_ID", "STATE", "EVENT_TYPE", "CZ_TYPE", "CZ_FIPS", "CZ_NAME", "CZ_TIMEZONE", "SOURCE", 
+                    "TOR_OTHER_CZ_STATE", "TOR_OTHER_CZ_FIPS", "TOR_OTHER_CZ_NAME", "BEGIN_LAT", "BEGIN_LON",
+                    "END_LAT", "END_LON", "STATE_FIPS")]
+
+head(newdata)
+# Now, 'selected_columns' contains only the specified columns.
+
+```
+
+## Step 3: Arrange the data by beginning year and month (BEGIN_YEARMONTH) 
+```{r}
+# install.packages("dplyr")  
+library(dplyr)
+
+# Arrange the DataFrame by YEARMONTH in ascending order
+arrange_data <- newdata %>%
+  arrange(BEGIN_YEARMONTH)
+
+head(arrange_data)
+```
+
+
+## Step 4: Change state and county names to title case (e.g., “New Jersey” instead of “NEW JERSEY”) 
+```{r}
+# install.packages("tools")  
+library(tools)
+
+# Change the "STATE" and "CZ_NAME" columns to title case
+newdata$STATE <- toTitleCase(arrange_data$STATE)
+newdata$CZ_NAME <- toTitleCase(arrange_data$CZ_NAME)
+```
+
+
+## Step 5: Limit to the events listed by county FIPS (CZ_TYPE of “C”) and then remove the CZ_TYPE column 
+```{r}
+# install.packages("dplyr")  
+library(dplyr)
+
+# Limit to events listed by county FIPS (CZ_TYPE of "C")
+filtered_data <- subset(arrange_data, CZ_TYPE == "C")
+
+# Remove the CZ_TYPE column
+filtered_data_rcz <- select(filtered_data, -CZ_TYPE)
+```
+
+
+## Stpe 6: Pad the state and county FIPS with a “0” at the beginning (hint: there’s a function in stringr to do this) and then unite the two columns to make one fips column with the 5 or 6-digit county FIPS code
+```{r}
+# install.packages("stringr")
+library(stringr)
+
+# Pad the STATE_FIPS and CZ_FIPS columns with "0" at the beginning
+filtered_data$STATE_FIPS <- str_pad(filtered_data_rcz$STATE_FIPS, width = 3, side="left", pad = "0")
+filtered_data$CZ_FIPS <- str_pad(filtered_data_rcz$CZ_FIPS, width = 3, pad = "0")
+
+# Unite the two columns into one FIPS column
+filtered_data$FIPS <- paste0(filtered_data$STATE_FIPS, filtered_data$CZ_FIPS)
+
+# Now, 'filtered_data' contains the FIPS column with 5 or 6-digit county FIPS codes
+head(filtered_data_rcz)
+```
+
+
+## Step 7: Change all the column names to lower case (you may want to try the rename_all function for this) 
+```{r}
+# install.packages("dplyr")  
+library(dplyr)
+
+# Change all column names to lowercase using rename_all
+newname_data <- filtered_data_rcz %>%
+  rename_all(tolower)
+
+head(newname_data)
+```
+
+
+## Step 8: There is data that comes with base R on U.S. states (data("state")). Use that to create a dataframe with these three columns: state name, area, and region 
+```{r}
+# Load the "state" dataset
+data("state")
+
+# Create a new DataFrame with state name, area, and region
+us_state_info<-data.frame(state=state.name, region=state.region, area=state.area)
+
+# Print the first few rows of the new DataFrame
+head(us_state_info)
+
+us_state_info$state <- toupper(us_state_info$state)
+
+
+```
+
+
+## Step 9: Create a dataframe with the number of events per state in the year of your birth. Merge in the state information dataframe you just created in step 8. Remove any states that are not in the state information dataframe. 
+
+```{r}
+# Create a frequency table for the specified column
+frequency_table<-table(newname_data$state)
+
+# Print the frequency table
+print(frequency_table)
+
+newset<-data.frame(table(newname_data$state))
+
+newset1<-rename(newset, c("state"="Var1"))
+
+merged <- merge(x=newset1,y=us_state_info,by.x="state", by.y="state")
+
+head(merged)
+
+
+
+```
+
+## Step 10: Create the following plot 
+```{r}
+library(ggplot2)
+
+stateyear_plot <- ggplot(merged, aes(x=area, y=Freq))+
+  geom_point(aes(color=region)) +
+  labs(x="State",
+       y="1997")
+
+show(stateyear_plot)
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
